@@ -1,0 +1,66 @@
+# WyreAI bid-item judge - one place for every setting.
+# Relative paths are resolved against the folder this file is in.
+# Override any value on the command line:  --set model.name=gemini-3.8-flash --set filters.limit=5
+# API key is NOT stored here: set the environment variable GEMINI_API_KEY.
+
+paths:
+  results: data/results.json          # the pipeline output to audit
+  pdf: data/drawings.pdf              # the drawing set
+  out_dir: output/run5                # everything is written here (cache/, evidence/, prompts/, ...)
+
+legend:
+  sheets: [G-002.3, G-501, G-511]     # reference sheets: used for the glossary, never judged, left untouched
+  file: null                          # null -> <out_dir>/legend.txt (extracted automatically).
+                                      # Set a path to use a hand-corrected legend instead.
+  max_chars: 60000                    # safety cap on what is injected into the prompt
+
+model:
+  # ---- PICK ONE provider by editing these 3 lines (examples below) ----
+  provider: gemini                    # gemini | qwen | groq | openai (openai = any OpenAI-compatible server, e.g. local Ollama)
+  name: gemini-3.8-flash              # model id. `py judge.py models` lists what your key/server offers
+  base_url: null                      # only for provider openai (or qwen: intl|cn)
+  #
+  # gemini : provider: gemini   name: gemini-3.8-flash          key: GEMINI_API_KEY
+  # groq   : provider: groq     name: qwen/qwen3.8-27b          key: GROQ_API_KEY
+  # qwen   : provider: qwen     name: (id from `models`)        key: DASHSCOPE_API_KEY
+  # local  : provider: openai   name: (ollama model tag)        base_url: http://localhost:11434/v1   (no key)
+  #          also set workers: 1 and a long context window in Ollama (the legend alone is ~10k tokens)
+  # Each provider needs a model that accepts IMAGES.
+  api_key_env: null                   # only to override the default key variable name
+  extra_body: null                    # provider-specific options, e.g. {enable_thinking: false} for Qwen
+  fallback_names: []                  # tried in order when the daily quota of `name` runs out (same provider)
+  min_seconds_between_calls: 0        # free tiers have per-minute limits: set e.g. 8 for groq
+  escalate_name: null                 # re-judge doubtful items with a stronger model (same provider)
+  escalate_below: 0.7                 # ... when confidence is below this, or the model asked for review
+  temperature: 0
+  workers: 4                          # parallel API calls
+  retries: 5
+
+triage:                               # cheap steps that save model calls (see triage.py)
+  rules: true                         # stage 0: obvious junk (URL-only text, bare dimensions, grid-bubble look) -> wrong, no call
+  legend_auto: true                   # stage 0: every text is a legend code whose meaning matches the item -> right, no call
+  trim_legend: true                   # prompt gets only the legend lines whose code appears in the item (not all ~34k chars)
+  text_first: true                    # stage 1: long-text items go to the model WITHOUT the image first
+  short_text_len: 20                  # items whose longest text is this short (tags like P-1) always get the image
+  text_min_confidence: 0.8            # text-only answers below this (or flagged for review) get the image pass too
+
+prompts:
+  file: prompts/judge.md              # rules + legend + the item, in one file. {{legend}} is replaced by
+                                      # legend.txt; the other {{...}} fields are filled in per item.
+
+image:
+  max_width: 3024                     # the sheet is sent at up to this width (native = 3024)
+  jpeg_quality: 85
+
+context:
+  max_regions_listed: 60              # distinct region texts listed in the prompt
+  nearby_text_regions: 6              # how many regions get "text around it" from the PDF text layer
+  nearby_text: true
+
+filters:                              # narrow a run while testing
+  sheets: []                          # e.g. [A-421]
+  packages: []                        # e.g. [Masonry]
+  limit: 0                            # 0 = all items
+
+export:
+  review_confidence_below: 0.7        # rows below this are flagged needs_review in the spreadsheet

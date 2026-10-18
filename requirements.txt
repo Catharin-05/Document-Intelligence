@@ -1,0 +1,7 @@
+pymupdf
+pillow
+pydantic
+openpyxl
+pyyaml
+google-genai
+openai   # only for provider qwen/openai
